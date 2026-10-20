@@ -6,11 +6,12 @@ compatibility_date = "2024-09-23"
 name = "GAME_ROOM"
 class_name = "GameRoom"
 
-# 旧設定をリセットし、v2 で SQLite 専用として完全新規適用する
+# 旧設定（失敗した構成情報）を明示的にリセット
 [[migrations]]
 tag = "v1"
 deleted_classes = ["GameRoom"]
 
+# SQLite ストレージを使用する新たなクラスとして強制再作成
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["GameRoom"]
