@@ -1,0 +1,142 @@
+---
+const WORKER_URL = import.meta.env.PUBLIC_WORKER_URL || "http://127.0.0.1:8787";
+---
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>人狼ゲーム</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#0f1115; --fg:#eee; --card:#1b1e26; --accent:#c94f4f; --ok:#4caf7d; }
+    body { margin:0; min-height:100vh; font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+    .wrap { max-width:480px; margin:0 auto; padding:1.2rem; }
+    .phase-badge { display:inline-block; padding:0.3rem 0.8rem; border-radius:999px; background:#333;
+      font-size:0.85rem; margin-bottom:1rem; }
+    .role-card { background:var(--card); border:2px solid var(--accent); border-radius:16px; padding:1.5rem;
+      text-align:center; margin-bottom:1.2rem; }
+    .role-card .role-name { font-size:1.8rem; font-weight:bold; margin:0.3rem 0; }
+    ul.players { list-style:none; padding:0; margin:0; }
+    ul.players li { display:flex; justify-content:space-between; align-items:center; background:var(--card);
+      padding:0.7rem 1rem; border-radius:10px; margin-bottom:0.5rem; }
+    .dead { opacity:0.4; text-decoration:line-through; }
+    .vote-btn { padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--accent); background:transparent;
+      color:var(--fg); cursor:pointer; }
+    .vote-btn.voted { background:var(--accent); color:white; }
+    h2 { font-size:1rem; opacity:0.8; margin:1.5rem 0 0.5rem; }
+    #status { font-size:0.85rem; opacity:0.7; }
+    .winner { text-align:center; font-size:1.4rem; padding:1.5rem; background:var(--card); border-radius:16px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="status">接続中...</div>
+    <div class="phase-badge" id="phaseBadge">—</div>
+    <div class="role-card" id="roleCard" style="display:none">
+      <div>あなたの役職</div>
+      <div class="role-name" id="roleName">?</div>
+    </div>
+    <div id="winnerBox"></div>
+    <h2>参加者</h2>
+    <ul class="players" id="playerList"></ul>
+  </div>
+
+  <script define:vars={{ WORKER_URL }}>
+    const params = new URLSearchParams(location.search);
+    const code = (params.get("code") || "").toUpperCase();
+    const name = params.get("name") || "名無し";
+    if (!code) location.href = "/join";
+
+    const pidKey = "jinro_pid_" + code;
+    let pid = localStorage.getItem(pidKey) || "";
+
+    const ROLE_LABELS = {
+      werewolf: "🐺 人狼",
+      villager: "🧑 村人",
+      seer: "🔮 占い師",
+      medium: "👻 霊媒師",
+      hunter: "🏹 狩人",
+      madman: "🃏 狂人",
+    };
+    const PHASE_LABELS = {
+      lobby: "参加者募集中",
+      night: "🌙 夜（議論前）",
+      day: "☀️ 昼（議論中）",
+      voting: "🗳️ 投票中",
+      result: "📜 結果発表",
+      ended: "🏁 ゲーム終了",
+    };
+
+    const wsProtocol = WORKER_URL.startsWith("https") ? "wss" : "ws";
+    const wsUrl = WORKER_URL.replace(/^https?/, wsProtocol) +
+      `/api/room/${code}/ws?role=player&name=${encodeURIComponent(name)}&pid=${pid}`;
+
+    const statusEl = document.getElementById("status");
+    const phaseBadge = document.getElementById("phaseBadge");
+    const roleCard = document.getElementById("roleCard");
+    const roleName = document.getElementById("roleName");
+    const playerList = document.getElementById("playerList");
+    const winnerBox = document.getElementById("winnerBox");
+
+    let myVote = null;
+    let ws;
+
+    function connect() {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => (statusEl.textContent = "接続しました");
+      ws.onclose = () => {
+        statusEl.textContent = "切断されました。再接続中...";
+        setTimeout(connect, 1500);
+      };
+      ws.onerror = () => (statusEl.textContent = "接続エラー");
+      ws.onmessage = (evt) => {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === "welcome") {
+          pid = msg.playerId;
+          localStorage.setItem(pidKey, pid);
+        } else if (msg.type === "your_role") {
+          roleCard.style.display = "block";
+          roleName.textContent = ROLE_LABELS[msg.role] || msg.role;
+        } else if (msg.type === "state") {
+          render(msg);
+        }
+      };
+    }
+    connect();
+
+    function render(state) {
+      phaseBadge.textContent = `ルーム ${state.roomCode}｜${PHASE_LABELS[state.phase] || state.phase}`;
+
+      if (state.winner) {
+        winnerBox.innerHTML = `<div class="winner">${
+          state.winner === "werewolves" ? "🐺 人狼陣営の勝利！" : "🧑 村人陣営の勝利！"
+        }</div>`;
+      } else {
+        winnerBox.innerHTML = "";
+      }
+
+      playerList.innerHTML = "";
+      for (const p of state.players) {
+        const li = document.createElement("li");
+        if (!p.alive) li.classList.add("dead");
+
+        const left = document.createElement("span");
+        left.textContent = p.name + (p.connected ? "" : "（離席）") + (p.role ? `  [${ROLE_LABELS[p.role] || p.role}]` : "");
+        li.appendChild(left);
+
+        if (state.phase === "voting" && p.alive && p.id !== pid) {
+          const btn = document.createElement("button");
+          btn.className = "vote-btn" + (myVote === p.id ? " voted" : "");
+          btn.textContent = state.votedPlayerIds.includes(pid) && myVote === p.id ? "投票済み" : "投票";
+          btn.addEventListener("click", () => {
+            myVote = p.id;
+            ws.send(JSON.stringify({ type: "vote", target: p.id }));
+            render(state);
+          });
+          li.appendChild(btn);
+        }
+        playerList.appendChild(li);
+      }
+    }
+  </script>
+</body>
+</html>
