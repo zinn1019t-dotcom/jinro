@@ -1,0 +1,31 @@
+---
+---
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>参加</title>
+  <style>
+    body { background:#0f1115; color:#eee; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0; }
+    .card { background:#1b1e26; padding:2rem; border-radius:12px; width:300px; }
+    input, button { width:100%; padding:0.8rem; margin-top:0.5rem; box-sizing:border-box; border-radius:6px; border:none; }
+    input { background:#11131a; color:#fff; border:1px solid #444; }
+    button { background:#c94f4f; color:#fff; font-weight:bold; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>部屋に参加</h2>
+    <input id="name" placeholder="名前" />
+    <input id="code" placeholder="部屋コード (5文字)" maxlength="5" style="text-transform:uppercase" />
+    <button id="btn">入室</button>
+  </div>
+  <script>
+    document.getElementById("btn")!.addEventListener("click", () => {
+      const name = (document.getElementById("name") as HTMLInputElement).value;
+      const code = (document.getElementById("code") as HTMLInputElement).value.toUpperCase();
+      if (name && code) location.href = `/room?code=${code}&name=${encodeURIComponent(name)}`;
+    });
+  </script>
+</body>
+</html>
