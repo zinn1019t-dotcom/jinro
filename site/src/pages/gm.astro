@@ -1,0 +1,59 @@
+---
+const WORKER_URL = "http://127.0.0.1:8787";
+---
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GM画面</title>
+  <style>
+    body { background:#0f1115; color:#eee; font-family:sans-serif; padding:1rem; max-width:400px; margin:0 auto; }
+    .card { background:#1b1e26; padding:1rem; border-radius:10px; margin-bottom:1rem; }
+    button { padding:0.6rem 1rem; border-radius:6px; border:none; background:#c94f4f; color:#fff; font-weight:bold; cursor:pointer; margin-right:0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <button id="createBtn">部屋を作成する</button>
+    <h2 id="codeDisplay">-----</h2>
+  </div>
+  <div class="card" id="controlBox" style="display:none">
+    <button id="startBtn">ゲーム開始</button>
+    <button id="nextBtn">次フェーズへ</button>
+    <button id="resetBtn">リセット</button>
+  </div>
+  <div class="card">
+    <h3>参加者</h3>
+    <ul id="players"></ul>
+  </div>
+
+  <script define:vars={{ WORKER_URL }}>
+    let ws = null;
+
+    document.getElementById("createBtn").addEventListener("click", async () => {
+      const res = await fetch(`${WORKER_URL}/api/create-room`, { method: "POST" });
+      const data = await res.json();
+      document.getElementById("codeDisplay").textContent = `部屋コード: ${data.code}`;
+      document.getElementById("controlBox").style.display = "block";
+
+      ws = new WebSocket(`${WORKER_URL.replace("http", "ws")}/api/room/${data.code}/ws?role=gm`);
+      ws.onmessage = (evt) => {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === "state") {
+          const list = document.getElementById("players");
+          list.innerHTML = "";
+          msg.players.forEach(p => {
+            const li = document.createElement("li");
+            li.textContent = `${p.name} ${p.role ? `[${p.role}]` : ""}`;
+            list.appendChild(li);
+          });
+        }
+      };
+    });
+
+    document.getElementById("startBtn").addEventListener("click", () => ws?.send(JSON.stringify({ type: "start_game" })));
+    document.getElementById("nextBtn").addEventListener("click", () => ws?.send(JSON.stringify({ type: "advance_phase" })));
+    document.getElementById("resetBtn").addEventListener("click", () => ws?.send(JSON.stringify({ type: "reset" })));
+  </script>
+</body>
+</html>
