@@ -1,0 +1,57 @@
+---
+const WORKER_URL = "http://127.0.0.1:8787";
+---
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>プレイヤー画面</title>
+  <style>
+    body { background:#0f1115; color:#eee; font-family:sans-serif; padding:1rem; max-width:400px; margin:0 auto; }
+    .card { background:#1b1e26; padding:1rem; border-radius:10px; margin-bottom:1rem; }
+    .role { font-size:1.5rem; font-weight:bold; color:#c94f4f; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="phase">接続中...</div>
+  </div>
+  <div class="card" id="roleCard" style="display:none">
+    <div>あなたの役職:</div>
+    <div class="role" id="roleName">-</div>
+  </div>
+  <div class="card">
+    <h3>参加者一覧</h3>
+    <ul id="players"></ul>
+  </div>
+
+  <script define:vars={{ WORKER_URL }}>
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code");
+    const name = params.get("name");
+    const pidKey = "jinro_pid_" + code;
+    let pid = localStorage.getItem(pidKey) || "";
+
+    const ws = new WebSocket(`${WORKER_URL.replace("http", "ws")}/api/room/${code}/ws?role=player&name=${encodeURIComponent(name)}&pid=${pid}`);
+
+    ws.onmessage = (evt) => {
+      const msg = JSON.parse(evt.data);
+      if (msg.type === "welcome") {
+        localStorage.setItem(pidKey, msg.playerId);
+      } else if (msg.type === "your_role") {
+        document.getElementById("roleCard").style.display = "block";
+        document.getElementById("roleName").textContent = msg.role;
+      } else if (msg.type === "state") {
+        document.getElementById("phase").textContent = `フェーズ: ${msg.phase}`;
+        const list = document.getElementById("players");
+        list.innerHTML = "";
+        msg.players.forEach(p => {
+          const li = document.createElement("li");
+          li.textContent = `${p.name} ${p.connected ? "" : "(切断)"} ${p.role ? `[${p.role}]` : ""}`;
+          list.appendChild(li);
+        });
+      }
+    };
+  </script>
+</body>
+</html>
