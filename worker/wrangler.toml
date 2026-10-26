@@ -1,4 +1,5 @@
 name = "jinro-realtime"
+account_id = "db6de9d9d0436bc2a3390588eb1cdcff"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 
