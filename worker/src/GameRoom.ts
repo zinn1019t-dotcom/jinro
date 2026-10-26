@@ -22,7 +22,8 @@ export class GameRoom implements DurableObject {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    this.state.acceptWebSocket(server);
+    // 標準の accept を呼び出す
+    server.accept();
 
     if (role === "player") {
       if (!pid) pid = Math.random().toString(36).substring(2, 9);
@@ -123,7 +124,11 @@ export class GameRoom implements DurableObject {
     };
 
     for (const ws of this.sessions.keys()) {
-      ws.send(JSON.stringify({ type: "state", ...state }));
+      try {
+        ws.send(JSON.stringify({ type: "state", ...state }));
+      } catch (e) {
+        // 切断済みソケットのエラーを握りつぶす
+      }
     }
   }
 }
