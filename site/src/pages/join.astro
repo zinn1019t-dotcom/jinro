@@ -24,7 +24,7 @@
     document.getElementById("btn")!.addEventListener("click", () => {
       const name = (document.getElementById("name") as HTMLInputElement).value;
       const code = (document.getElementById("code") as HTMLInputElement).value.toUpperCase();
-      if (name && code) location.href = `/room?code=${code}&name=${encodeURIComponent(name)}`;
+      if (name && code) location.href = `/jinro/room?code=${code}&name=${encodeURIComponent(name)}`;
     });
   </script>
 </body>
